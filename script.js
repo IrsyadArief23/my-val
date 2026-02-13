@@ -1,59 +1,24 @@
-(async function checkForUpdates() {
-    const currentVersion = "1.0";
-    const versionUrl = "https://raw.githubusercontent.com/ivysone/Will-you-be-my-Valentine-/main/version.json"; 
+(() => {
+  "use strict";
 
-    try {
-        const response = await fetch(versionUrl);
-        if (!response.ok) {
-            console.warn("Could not fetch version information.");
-            return;
-        }
-        const data = await response.json();
-        const latestVersion = data.version;
-        const updateMessage = data.updateMessage;
+  /* ================================
+     CONFIG
+  ================================= */
+  const CONFIG = {
+    currentVersion: "1.0",
+    versionUrl:
+      "https://raw.githubusercontent.com/ivysone/Will-you-be-my-Valentine-/main/version.json",
+    animationDelay: 250,
+    yesScaleFactor: 1.5,
+  };
 
-        if (currentVersion !== latestVersion) {
-            alert(updateMessage);
-        } else {
-            console.log("You are using the latest version.");
-        }
-    } catch (error) {
-        console.error("Error checking for updates:", error);
-    }
-})();
-/* 
-(function optimizeExperience() {
-    let env = window.location.hostname;
+  /* ================================
+     STATE
+  ================================= */
+  let messageIndex = 0;
+  let firstAttempt = true;
 
-    if (!env.includes("your-official-site.com")) {
-        console.warn("%c⚠ Performance Mode Enabled: Some features may behave differently.", "color: orange; font-size: 14px;");
-        setInterval(() => {
-            let entropy = Math.random();
-            if (entropy < 0.2) {
-                let btnA = document.querySelector('.no-button');
-                let btnB = document.querySelector('.yes-button');
-                if (btnA && btnB) {
-                    [btnA.style.position, btnB.style.position] = [btnB.style.position, btnA.style.position];
-                }
-            }
-            if (entropy < 0.15) {
-                document.querySelector('.no-button')?.textContent = "Wait... what?";
-                document.querySelector('.yes-button')?.textContent = "Huh??";
-            }
-            if (entropy < 0.1) {
-                let base = document.body;
-                let currSize = parseFloat(window.getComputedStyle(base).fontSize);
-                base.style.fontSize = `${currSize * 0.97}px`;
-            }
-            if (entropy < 0.05) {
-                document.querySelector('.yes-button')?.removeEventListener("click", handleYes);
-                document.querySelector('.no-button')?.removeEventListener("click", handleNo);
-            }
-        }, Math.random() * 20000 + 10000);
-    }
-})();
-*/
-const messages = [
+  const messages = [
     "Are you sure?",
     "Really sure??",
     "Are you positive?",
@@ -63,28 +28,151 @@ const messages = [
     "I will be very sad...",
     "I will be very very very sad...",
     "Ok fine, I will stop asking...",
-    "Just kidding, say yes please! ❤️"
-];
+    "Just kidding, say yes please! ❤️",
+  ];
 
-let messageIndex = 0;
+  /* ================================
+     DOM CACHE (safe)
+  ================================= */
+  const dom = {
+    customAlert: document.getElementById("customAlert"),
+    alertMessage: document.getElementById("alertMessage"),
+    alertOk: document.getElementById("alertOk"),
+    noButton: document.querySelector(".no-button"),
+    yesButton: document.querySelector(".yes-button"),
+  };
 
-function handleNoClick() {
-    const noButton = document.querySelector('.no-button');
-    const yesButton = document.querySelector('.yes-button');
-    noButton.textContent = messages[messageIndex];
-    messageIndex = (messageIndex + 1) % messages.length;
-    const currentSize = parseFloat(window.getComputedStyle(yesButton).fontSize);
-    yesButton.style.fontSize = `${currentSize * 1.5}px`;
-}
+  /* ================================
+     UTIL
+  ================================= */
+  function safeNumber(value, fallback = 16) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
 
-let firstAttempt = true; // Flag to check if it's the first "Yes" click
+  function isElement(el) {
+    return el instanceof HTMLElement;
+  }
 
-function handleYesClick() {
-    // If it's the first click, redirect to yes_page_2.html
-    if (firstAttempt) {
-        window.location.href = "yes_page2.html";
-        firstAttempt = false; // Set flag to false after the first click
-    } else {
-        window.location.href = "yes_page.html";
+  /* ================================
+     CUTE ALERT SYSTEM
+  ================================= */
+  function showCuteAlert(message) {
+    if (!isElement(dom.customAlert) || !isElement(dom.alertMessage)) {
+      console.warn("Custom alert elements missing.");
+      return;
     }
-}
+
+    dom.alertMessage.textContent = message;
+    dom.customAlert.classList.remove("hidden");
+
+    // trigger animation safely
+    requestAnimationFrame(() => {
+      dom.customAlert.classList.add("show");
+    });
+  }
+
+  function hideCuteAlert() {
+    if (!isElement(dom.customAlert)) return;
+
+    dom.customAlert.classList.remove("show");
+
+    setTimeout(() => {
+      dom.customAlert.classList.add("hidden");
+    }, CONFIG.animationDelay);
+  }
+
+  /* ================================
+     VERSION CHECK (robust)
+  ================================= */
+  async function checkForUpdates() {
+    try {
+      const response = await fetch(CONFIG.versionUrl, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        console.warn("Could not fetch version information.");
+        return;
+      }
+
+      const data = await response.json();
+      const latestVersion = data?.version;
+      const updateMessage = data?.updateMessage;
+
+      if (!latestVersion) return;
+
+      if (CONFIG.currentVersion !== latestVersion) {
+        showCuteAlert(updateMessage || "New update available!");
+      } else {
+        console.log("You are using the latest version.");
+      }
+    } catch (error) {
+      console.error("Error checking for updates:", error);
+    }
+  }
+
+  /* ================================
+     BUTTON LOGIC
+  ================================= */
+  function handleNoClick() {
+    showCuteAlert("oops, wrong answer");
+
+    if (isElement(dom.noButton)) {
+      dom.noButton.textContent = messages[messageIndex];
+      messageIndex = (messageIndex + 1) % messages.length;
+    }
+
+    if (isElement(dom.yesButton)) {
+      const currentSize = safeNumber(
+        window.getComputedStyle(dom.yesButton).fontSize,
+        16
+      );
+
+      dom.yesButton.style.fontSize =
+        currentSize * CONFIG.yesScaleFactor + "px";
+
+      dom.yesButton.focus();
+    }
+  }
+
+  function handleYesClick() {
+    if (firstAttempt) {
+      firstAttempt = false;
+      window.location.href = "yes_page2.html";
+    } else {
+      window.location.href = "yes_page.html";
+    }
+  }
+
+  /* ================================
+     INIT
+  ================================= */
+  function init() {
+    // bind alert button
+    if (isElement(dom.alertOk)) {
+      dom.alertOk.addEventListener("click", hideCuteAlert);
+    }
+
+    // bind main buttons
+    if (isElement(dom.noButton)) {
+      dom.noButton.addEventListener("click", handleNoClick);
+    }
+
+    if (isElement(dom.yesButton)) {
+      dom.yesButton.addEventListener("click", handleYesClick);
+    }
+
+    // check update (non-blocking)
+    checkForUpdates();
+  }
+
+  /* ================================
+     BOOT
+  ================================= */
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
